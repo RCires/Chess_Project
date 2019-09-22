@@ -1,0 +1,2076 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+
+#define ROW 16//Board Rows
+#define COL 16//Board Columns 
+#define BUFFSIZE 1024
+#define ofst 97//ASCii offset for (a-h) = (97 to 104)
+
+/*Commands to be supported in the game*/
+//m = move piece from #(A-H) to #(A-H)
+//c = using piece at #(A-H) capture piece here #(A-H)
+//s = print board how it currently looks in .tl5
+
+//Arrays to sort board and pawn initial status
+int p[COL] = {0,0,0,0,0,0,0,0};//Black pawns at start
+int P[COL] = {0,0,0,0,0,0,0,0};//White pawns at start
+
+
+
+char pass[BUFFSIZE]= "", ch;
+FILE *boardFile;
+FILE *outF;
+char board[ROW][COL] =
+{
+	{'r','k','b','a','q','b','k','r'},//Black
+	{'p','p','p','p','p','p','p','p'},//Black
+	{'0','0','0','0','0','0','0','0'},
+	{'0','0','0','0','0','0','0','0'},
+	{'0','0','0','0','0','0','0','0'},
+	{'0','0','0','0','0','0','0','0'},
+	{'P','P','P','P','P','P','P','P'},//White
+	{'R','K','B','A','Q','B','K','R'} //White
+};
+
+//Functions to update/sort/print chess board
+char letters[COL] = {'a','b','c','d','e','f','g','h'};//Top letters for board
+void displayBoard();//Board Display
+void updateBoard(int, int, int, int);//Updates on move
+void updateBoardC(int, int, int, int);//Updates on capture
+void show(FILE *bFile);//Show on screen in .tl5 format
+void emptystdin();//Flushes standard input
+
+//Functions used for setting parameters of game
+void player();//White Player
+void player2();//Black Player
+
+/* Functions for White Pieces */
+int check(int,int);//Checks if White can capture
+void Pawn(int,int);//White Pawns move
+void PawnC(int,int);//White Pawns capture
+void knight(int,int);//Knight move
+void knightC(int,int);//White Knight capture 
+void bishop(int,int);//Bishop move
+void bishopC(int,int);//White Bishop capture
+void rook(int,int);//Rook move
+void rookC(int,int);//White Rook capture
+void king(int,int);//King move
+void kingC(int,int);//White King capture
+void queen(int,int);//Queen move
+void queenC(int,int);//White Queen capture
+
+/* Functions for Black Pieces */
+/* Only Changes are pawn movement and check parameters */
+int check2(int,int);//Checks if Black can capture
+void pawnb(int,int);//Black Pawns move
+void pawnCb(int,int);//Black Pawns capture
+void knightCb(int,int);//Black Knight capture
+void bishopCb(int,int);//Black Bishop capture
+void rookCb(int,int);//Black Rook capture
+void kingCb(int,int);//Black King capture
+void queenCb(int,int);//Black Queen capture
+
+
+/* Used to clear standard input from \n and whitespace */
+void emptystdin()
+{
+	int empty = getchar();
+	for(; empty != '\n' && empty != ' '; empty = getchar()) {}
+}
+
+
+
+
+int main(int argc, char *argv[])
+{	
+	printf("Welcome to chess on C!\n");
+	printf("Player 1 controls the White pieces and Player 2 controls the Black pieces.\n");
+	printf("Kings are denoted by 'a' or 'A', and the other's are the first letter of their name.\n");
+	printf("Hope you enjoy!\n");
+	char GO;
+	printf("\n");
+	int turn = 2;
+	
+	do{
+		
+		if((turn % 2) == 0)
+		{
+			displayBoard();
+			printf("Commands are:\n");
+			printf("type 'm' is to move\n");
+			printf("type 'c' is to capture\n");
+			printf("type 's' to print current board into .tl5 format\n");
+			printf("Player 1's (White Pieces) turn!\n");
+			player();
+			turn++;
+			emptystdin();
+		}
+		else
+		{
+			
+			displayBoard();
+			printf("Commands are:\n");
+			printf("type 'm' is to move\n");
+			printf("type 'c' is to capture\n");
+			printf("type 's' to print current board into .tl5 format\n");
+			printf("Player 2's (Black Pieces) turn!\n");
+			player2();
+			turn++;
+			emptystdin();
+		}
+		
+		printf("Press enter to continue to next round or 'anykey'+enter to escape.\n");
+		
+		GO = getchar();
+		
+	}while(GO == 10);
+
+	printf("Thank you for playing!\n");
+	return 0;
+	
+}
+
+/* Displays Current Board */
+void displayBoard()
+{
+	boardFile = fopen("board.csv", "w");
+	int i,j,r,p,k;
+	int spc = 4;
+	fprintf(boardFile,"%c", '\n');
+	printf(" ");
+	for(i = 0; i < COL; i++)
+	printf("%*c", spc, letters[i]); //Letters on the top of the table
+	printf("\n");
+
+	for(r = 1; r < 9; r++)//Numbers on the left of table
+	{
+
+		printf("  ");
+		for(i = 0; i < 33; i++)
+		{
+			printf("-");
+		}
+		printf("\n");
+		printf("%d ", r);
+		
+		
+		
+		for(j = 0; j < 8; j++)
+		{
+			printf("| %c ", board[r - 1][j]);
+			fprintf(boardFile,"%c,", board[r - 1][j]);
+			
+		}
+		fprintf(boardFile,"%c", '\n');
+		printf("|\n");
+	}
+
+	printf("  ");
+	for(i = 0; i < 33; i++)
+	{
+		printf("-");
+	}
+	printf("\n");
+	fclose(boardFile);
+}
+
+/* Updates Chess Board on Move */
+void updateBoard(int row1, int col1, int row2, int col2)
+{
+	char temp;
+	temp = board[row1][col1];
+	board[row1][col1] = board[row2][col2];
+	board[row2][col2] = temp;
+}
+
+/* Updates Chess Board on Capture */
+void updateBoardC(int row1, int col1, int row2, int col2)
+{
+	char temp = '0';
+	board[row2][col2] = board[row1][col1];
+	board[row1][col1] = temp;
+}
+
+/* Player Controlling White Pieces */
+void player()
+{
+	int row1, row2, col1, col2, command;
+doover:
+	
+	printf("Do you wish to move, capture or show?\n");
+	scanf("%c", &command);
+
+	switch (command)
+	{
+	case 'm':
+mv:
+		printf("You chose move.\n");
+		printf("Enter row number(1-8) and then column letter(a-h) of desired piece to move.\n");
+
+		scanf("%d%c", &row1, &col1);
+
+		printf("You Selected: %d%c\n", row1, col1);
+		row1--;
+		col1 = abs(ofst - col1);
+
+
+		switch(board[row1][col1])
+		{
+		case 'P':// Pawn move
+
+			printf("You selected a pawn.\n");
+			Pawn(row1,col1);//Shows available moves
+
+			printf("Enter row number(1-8) and column letter(a-h) of available moves.\n");
+
+			scanf("%d%c", &row2, &col2);
+
+			printf("You Selected: %d%c\n", row2, col2);
+			row2--;
+			col2 = abs(ofst - col2);
+
+			updateBoard(row1, col1, row2, col2);
+
+			break;
+			
+		case 'K'://Knight move
+			
+			printf("You selected a knight.\n");
+			knight(row1,col1);//Shows available moves
+
+			printf("Enter row number(1-8) and column letter(a-h) of available moves.\n");
+
+			scanf("%d%c", &row2, &col2);
+
+			printf("You Selected: %d%c\n", row2, col2);
+			row2--;
+			col2 = abs(ofst - col2);
+
+			updateBoard(row1, col1, row2, col2);
+
+			break;
+			
+		case 'B'://Bishop move
+			
+			printf("You selected a bishop.\n");
+			bishop(row1,col1);//Shows available moves
+
+			printf("Enter row number(1-8) and column letter(a-h) of available moves.\n");
+
+			scanf("%d%c", &row2, &col2);
+
+			printf("You Selected: %d%c\n", row2, col2);
+			row2--;
+			col2 = abs(ofst - col2);
+
+			updateBoard(row1, col1, row2, col2);
+			
+			break;
+			
+		case 'R'://Rook move
+			
+			printf("You selected a rook.\n");
+			rook(row1,col1);//Shows available moves
+
+			printf("Enter row number(1-8) and column letter(a-h) of available moves.\n");
+
+			scanf("%d%c", &row2, &col2);
+
+			printf("You Selected: %d%c\n", row2, col2);
+			row2--;
+			col2 = abs(ofst - col2);
+
+			updateBoard(row1, col1, row2, col2);
+			
+			break;
+			
+		case 'A'://King move
+			
+			printf("You selected your king.\n");
+			king(row1,col1);//Shows available moves
+
+			printf("Enter row number(1-8) and column letter(a-h) of available moves.\n");
+
+			scanf("%d%c", &row2, &col2);
+
+			printf("You Selected: %d%c\n", row2, col2);
+			row2--;
+			col2 = abs(ofst - col2);
+
+			updateBoard(row1, col1, row2, col2);
+			
+			break;
+			
+		case 'Q'://Queen move
+			
+			printf("You selected your queen.\n");
+			queen(row1,col1);//Shows available moves
+
+			printf("Enter row number(1-8) and column letter(a-h) of available moves.\n");
+
+			scanf("%d%c", &row2, &col2);
+
+			printf("You Selected: %d%c\n", row2, col2);
+			row2--;
+			col2 = abs(ofst - col2);
+
+			updateBoard(row1, col1, row2, col2);
+			
+			break;
+			
+			
+		default:
+			printf("Invalid move location.\n");
+			command = '\0';
+			goto mv;
+		}
+		break;
+		
+	case 'c':
+cp:
+		printf("You chose capture.\n");
+		printf("Enter row number(1-8) and then column letter(a-h) of desired piece to use.\n");
+
+		scanf("%d%c", &row1, &col1);
+
+		printf("You Selected: %d%c\n", row1, col1);
+		row1--;
+		col1 = abs(ofst - col1);
+		switch(board[row1][col1])
+		{
+		case 'P'://Pawn cap
+			printf("You selected a pawn.\n");
+
+			PawnC(row1,col1);//Show available spaces
+			
+			printf("Enter row number(1-8) and column letter(a-h) of available captures.\n");
+
+			scanf("%d%c", &row2, &col2);
+
+			printf("You Selected: %d%c\n", row2, col2);
+			row2--;
+			col2 = abs(ofst - col2);
+			
+			if(check(row2,col2) == 1)
+			{
+				
+				updateBoardC(row1, col1, row2, col2);
+				printf("Piece captured!\n");
+			}	
+			else
+			{
+				printf("Input not part of available captures.\n");
+				goto cp;
+			}
+			
+			break;
+			
+		case 'K'://Knight cap
+			printf("You selected a knight.\n");
+
+			knightC(row1,col1);//Show available spaces
+			
+			printf("Enter row number(1-8) and column letter(a-h) of available captures.\n");
+
+			scanf("%d%c", &row2, &col2);
+
+			printf("You Selected: %d%c\n", row2, col2);
+			row2--;
+			col2 = abs(ofst - col2);
+			
+			if(check(row2,col2) == 1)
+			{
+				
+				updateBoardC(row1, col1, row2, col2);
+				printf("Piece captured!\n");
+			}	
+			else
+			{
+				printf("Input not part of available captures.\n");
+				goto cp;
+			}
+			break;
+			
+		case 'B'://Bishop cap
+			printf("You selected a bishop.\n");
+
+			bishopC(row1,col1);//Show available spaces
+			
+			printf("Enter row number(1-8) and column letter(a-h) of available captures.\n");
+
+			scanf("%d%c", &row2, &col2);
+
+			printf("You Selected: %d%c\n", row2, col2);
+			row2--;
+			col2 = abs(ofst - col2);
+			
+			if(check(row2,col2) == 1)
+			{
+				
+				updateBoardC(row1, col1, row2, col2);
+				printf("Piece captured!\n");
+			}	
+			else
+			{
+				printf("Input not part of available captures.\n");
+				goto cp;
+			}
+			break;
+			
+		case 'R'://Rook cap
+			printf("You selected a rook.\n");
+
+			rookC(row1,col1);//Show available spaces
+			
+			printf("Enter row number(1-8) and column letter(a-h) of available captures.\n");
+
+			scanf("%d%c", &row2, &col2);
+
+			printf("You Selected: %d%c\n", row2, col2);
+			row2--;
+			col2 = abs(ofst - col2);
+			
+			if(check(row2,col2) == 1)
+			{
+				updateBoardC(row1, col1, row2, col2);
+				printf("Piece captured!\n");
+			}	
+			else
+			{
+				printf("Input not part of available captures.\n");
+				goto cp;
+			}
+			break;
+			
+		case 'A'://King cap
+			printf("You selected your king.\n");
+
+			kingC(row1,col1);//Show available spaces
+			
+			printf("Enter row number(1-8) and column letter(a-h) of available captures.\n");
+
+			scanf("%d%c", &row2, &col2);
+
+			printf("You Selected: %d%c\n", row2, col2);
+			row2--;
+			col2 = abs(ofst - col2);
+			
+			if(check(row2,col2) == 1)
+			{
+				updateBoardC(row1, col1, row2, col2);
+				printf("Piece captured!\n");
+			}	
+			else
+			{
+				printf("Input not part of available captures.\n");
+				goto cp;
+			}
+			break;
+			
+		case 'Q'://Queen cap
+			printf("You selected your king.\n");
+			printf("Value of capture col1: %d\n", col1);
+			printf("Value of capture row1: %d\n", row1);
+			queenC(row1,col1);//Show available spaces
+			
+			printf("Enter row number(1-8) and column letter(a-h) of available captures.\n");
+
+			scanf("%d%c", &row2, &col2);
+
+			printf("You Selected: %d%c\n", row2, col2);
+			row2--;
+			col2 = abs(ofst - col2);
+			
+			if(check(row2,col2) == 1)
+			{
+				updateBoardC(row1, col1, row2, col2);
+				printf("Piece captured!\n");
+			}	
+			else
+			{
+				printf("Input not part of available captures.\n");
+				goto cp;
+			}
+			break;
+			
+		default:
+			printf("Invalid capture location.\n");
+			goto cp;
+		}
+		break;
+	case 's':
+		printf("You chose show.\n");
+		printf("Printing board now.\n");
+		
+		outF = fopen("board.csv", "r");
+		show(outF);
+		fclose(outF);
+		printf("Board printed.\n");
+		goto doover;
+		break;
+	default:
+		printf("You entered an unrecognized command.\n only cp, mv and show are supported commands.\n");
+		goto doover;
+	}
+}
+/* Player Controlling White Pieces END */
+
+
+/* Player Controlling Black Pieces */
+void player2()
+{
+	int row1, row2, col1, col2, command;
+doover2:
+	
+	printf("Do you wish to move, capture or show?\n");
+	scanf("%c", &command);
+
+	switch (command)
+	{
+	case 'm':
+mv2:
+		printf("You chose move.\n");
+		printf("Enter row number(1-8) and then column letter(a-h) of desired piece to move.\n");
+
+		scanf("%d%c", &row1, &col1);
+
+		printf("You Selected: %d%c\n", row1, col1);
+		row1--;
+		col1 = abs(ofst - col1);
+
+
+		switch(board[row1][col1])
+		{
+		case 'p'://Pawn move Black
+
+			printf("You selected a pawn.\n");
+			pawnb(row1,col1);//Shows available moves
+
+			printf("Enter row number(1-8) and column letter(a-h) of available moves.\n");
+
+			scanf("%d%c", &row2, &col2);
+
+			printf("You Selected: %d%c\n", row2, col2);
+			row2--;
+			col2 = abs(ofst - col2);
+
+			updateBoard(row1, col1, row2, col2);
+
+			break;
+			
+		case 'k'://Knight move
+			
+			printf("You selected a knight.\n");
+			knight(row1,col1);//Shows available moves
+
+			printf("Enter row number(1-8) and column letter(a-h) of available moves.\n");
+
+			scanf("%d%c", &row2, &col2);
+
+			printf("You Selected: %d%c\n", row2, col2);
+			row2--;
+			col2 = abs(ofst - col2);
+
+			updateBoard(row1, col1, row2, col2);
+
+			break;
+			
+		case 'b'://Bishop move
+			
+			printf("You selected a bishop.\n");
+			bishop(row1,col1);//Shows available moves
+
+			printf("Enter row number(1-8) and column letter(a-h) of available moves.\n");
+
+			scanf("%d%c", &row2, &col2);
+
+			printf("You Selected: %d%c\n", row2, col2);
+			row2--;
+			col2 = abs(ofst - col2);
+
+			updateBoard(row1, col1, row2, col2);
+			
+			break;
+			
+		case 'r'://Rook move
+			
+			printf("You selected a rook.\n");
+			rook(row1,col1);//Shows available moves
+
+			printf("Enter row number(1-8) and column letter(a-h) of available moves.\n");
+
+			scanf("%d%c", &row2, &col2);
+
+			printf("You Selected: %d%c\n", row2, col2);
+			row2--;
+			col2 = abs(ofst - col2);
+
+			updateBoard(row1, col1, row2, col2);
+			
+			break;
+			
+		case 'a'://King move
+			
+			printf("You selected your king.\n");
+			king(row1,col1);//Shows available moves
+
+			printf("Enter row number(1-8) and column letter(a-h) of available moves.\n");
+
+			scanf("%d%c", &row2, &col2);
+
+			printf("You Selected: %d%c\n", row2, col2);
+			row2--;
+			col2 = abs(ofst - col2);
+
+			updateBoard(row1, col1, row2, col2);
+			
+			break;
+			
+		case 'q'://Queen move
+			
+			printf("You selected your queen.\n");
+			queen(row1,col1);//Shows available moves
+
+			printf("Enter row number(1-8) and column letter(a-h) of available moves.\n");
+
+			scanf("%d%c", &row2, &col2);
+
+			printf("You Selected: %d%c\n", row2, col2);
+			row2--;
+			col2 = abs(ofst - col2);
+
+			updateBoard(row1, col1, row2, col2);
+			
+			break;
+			
+			
+		default:
+			printf("Invalid move location.\n");
+			command = '\0';
+			goto mv2;
+		}
+		break;
+		
+	case 'c'://Black Pieces Capture Locations
+cp2:
+		printf("You chose capture.\n");
+		printf("Enter row number(1-8) and then column letter(a-h) of desired piece to use.\n");
+
+		scanf("%d%c", &row1, &col1);
+
+		printf("You Selected: %d%c\n", row1, col1);
+		printf("Value for row1 is: %d\n", row1);
+		row1--;
+		col1 = abs(ofst - col1);
+		switch(board[row1][col1])
+		{
+		case 'p'://Pawn cap Black
+			printf("You selected a pawn.\n");
+
+			pawnCb(row1,col1);//Show available spaces
+			
+			printf("Enter row number(1-8) and column letter(a-h) of available captures.\n");
+
+			scanf("%d%c", &row2, &col2);
+
+			printf("You Selected: %d%c\n", row2, col2);
+			row2--;
+			col2 = abs(ofst - col2);
+			
+			if(check2(row2,col2) == 1)
+			{	
+				updateBoardC(row1, col1, row2, col2);
+				printf("Piece captured!\n");
+			}	
+			else
+			{
+				printf("Input not part of available captures.\n");
+				goto cp2;
+			}
+			
+			break;
+			
+		case 'k'://Knight cap Black
+			printf("You selected a knight.\n");
+
+			knightCb(row1,col1);//Show available spaces
+			
+			printf("Enter row number(1-8) and column letter(a-h) of available captures.\n");
+
+			scanf("%d%c", &row2, &col2);
+
+			printf("You Selected: %d%c\n", row2, col2);
+			row2--;
+			col2 = abs(ofst - col2);
+			
+			if(check2(row2,col2) == 1)
+			{	
+				updateBoardC(row1, col1, row2, col2);
+				printf("Piece captured!\n");
+			}	
+			else
+			{
+				printf("Input not part of available captures.\n");
+				goto cp2;
+			}
+			break;
+			
+		case 'b'://Bishop cap Black
+			printf("You selected a bishop.\n");
+
+			bishopCb(row1,col1);//Show available spaces
+			
+			printf("Enter row number(1-8) and column letter(a-h) of available captures.\n");
+
+			scanf("%d%c", &row2, &col2);
+
+			printf("You Selected: %d%c\n", row2, col2);
+			row2--;
+			col2 = abs(ofst - col2);
+			
+			if(check2(row2,col2) == 1)
+			{
+				
+				updateBoardC(row1, col1, row2, col2);
+				printf("Piece captured!\n");
+			}	
+			else
+			{
+				printf("Input not part of available captures.\n");
+				goto cp2;
+			}
+			break;
+			
+		case 'r'://Rook cap Black
+			printf("You selected a rook.\n");
+
+			rookCb(row1,col1);//Show available spaces
+			
+			printf("Enter row number(1-8) and column letter(a-h) of available captures.\n");
+
+			scanf("%d%c", &row2, &col2);
+
+			printf("You Selected: %d%c\n", row2, col2);
+			row2--;
+			col2 = abs(ofst - col2);
+			
+			if(check2(row2,col2) == 1)
+			{
+				updateBoardC(row1, col1, row2, col2);
+				printf("Piece captured!\n");
+			}	
+			else
+			{
+				printf("Input not part of available captures.\n");
+				goto cp2;
+			}
+			break;
+			
+		case 'a'://King cap Black
+			printf("You selected your king.\n");
+
+			kingCb(row1,col1);//Show available spaces
+			
+			printf("Enter row number(1-8) and column letter(a-h) of available captures.\n");
+
+			scanf("%d%c", &row2, &col2);
+
+			printf("You Selected: %d%c\n", row2, col2);
+			row2--;
+			col2 = abs(ofst - col2);
+			
+			if(check2(row2,col2) == 1)
+			{
+				updateBoardC(row1, col1, row2, col2);
+				printf("Piece captured!\n");
+			}	
+			else
+			{
+				printf("Input not part of available captures.\n");
+				goto cp2;
+			}
+			break;
+			
+		case 'q'://Queen cap Black
+			printf("You selected your king.\n");
+			printf("Value of capture col1: %d\n", col1);
+			printf("Value of capture row1: %d\n", row1);
+			queenCb(row1,col1);//Show available spaces
+			
+			printf("Enter row number(1-8) and column letter(a-h) of available captures.\n");
+
+			scanf("%d%c", &row2, &col2);
+
+			printf("You Selected: %d%c\n", row2, col2);
+			row2--;
+			col2 = abs(ofst - col2);
+			
+			if(check2(row2,col2) == 1)
+			{
+				updateBoardC(row1, col1, row2, col2);
+				printf("Piece captured!\n");
+			}	
+			else
+			{
+				printf("Input not part of available captures.\n");
+				goto cp2;
+			}
+			break;
+			
+		default:
+			printf("Invalid capture location.\n");
+			goto cp2;
+		}
+		break;
+	case 's':
+		printf("You chose show.\n");
+		printf("Printing board now.\n");
+		
+		outF = fopen("board.csv", "r");
+		show(outF);
+		fclose(outF);
+		printf("Board printed.\n");
+		goto doover2;
+		break;
+	default:
+		printf("You entered an unrecognized command.\n only cp, mv and show are supported commands.\n");
+		goto doover2;
+	}
+}
+/* Player Controlling Black Pieces END */
+
+
+/* Handles move rules for White Pawns */
+void Pawn(int row, int col)
+{
+	printf("Available moves for this piece are:\n");
+
+	int column = col + ofst;//Convert int to a char
+
+	P[col]++;
+	if(P[col] == 1)
+	{
+		if(board[row - 1][col] == '0')
+		{
+			printf("%d%c\n", row, column);
+		}		
+		if(board[row - 2][col] == '0')
+		{
+			printf("%d%c\n", row - 1, column);
+		}	
+	}
+	else
+	{
+		if(board[row - 1][col] == '0')
+		{
+			printf("%d%c\n", row, column);
+		}	
+	}
+}
+
+/* Handles capture rules for White Pawns */
+void PawnC(int row, int col)
+{
+	printf("Available captures for this piece are:\n");
+	int column = col + ofst;
+	
+	if(check(row - 1, col - 1) == 1)
+	{
+		printf("%d%c\n", row, column - 1);
+	}
+
+	if(check(row - 1,col + 1) == 1)
+	{
+		printf("%d%c\n", row, column + 1);
+		
+	}
+	
+	if(check(row - 1,col + 1) == 0 && check(row - 1, col - 1) == 0)
+	{
+		printf("There are no available pieces to capture.\n");
+	}
+}
+
+/* Handles move rules for Knights */
+void knight(int row, int col)
+{
+	printf("Available moves for this piece are:\n");
+	int column = col + ofst;
+	
+	if(board[row + 2][col + 1] == '0')
+	{
+		if((col + 1) < 8)
+		printf("%d%c\n", row + 3, column + 1);
+	}
+	if(board[row + 2][col - 1] == '0')
+	{
+		if((col - 1) >= 0)
+		printf("%d%c\n", row + 3, column - 1);
+	}
+	
+	if(board[row + 1][col + 2] == '0')
+	{
+		if((col + 2) < 8)
+		printf("%d%c\n", row + 2, column + 2);
+	}
+	if(board[row - 1][col + 2] == '0')
+	{
+		if((col + 2) < 8)
+		printf("%d%c\n", row, column + 2);
+	}
+	
+	if(board[row - 2][col - 1] == '0')
+	{
+		if((col - 1) >= 0)
+		printf("%d%c\n", row - 1, column - 1);
+	}
+	
+	if(board[row - 2][col + 1] == '0')
+	{
+		if((col + 1) < 8)
+		printf("%d%c\n", row-1, column + 1);
+	}
+	if(board[row + 1][col - 2] == '0')
+	{
+		if((col - 2) >= 0)
+		printf("%d%c\n", row + 2, column - 2);
+	}
+	
+	if(board[row - 1][col - 2] == '0')
+	{
+		if((col - 2) >= 0)
+		printf("%d%c\n", row, column - 2);
+	}
+}
+
+/* Handles capture rules for Knights */
+void knightC(int row, int col)
+{
+	printf("Available captures for this piece are:\n");
+	int column = col + ofst;
+	
+	if(check(row + 2,col + 1) == 1)
+	{
+		if((col + 1) < 8)
+		printf("%d%c\n", row + 3, column + 1);
+	}
+	if(check(row + 2,col - 1) == 1)
+	{
+		if((col - 1) >= 0)
+		printf("%d%c\n", row + 3, column - 1);
+	}
+	
+	if(check(row + 1,col + 2) == 1)
+	{
+		if((col + 2) < 8)
+		printf("%d%c\n", row + 2, column + 2);
+	}
+	if(check(row - 1,col + 2) == 1)
+	{
+		if((col + 2) < 8)
+		printf("%d%c\n", row, column + 2);
+	}
+	
+	if(check(row - 2,col - 1) == 1)
+	{
+		if((col - 1) >= 0)
+		printf("%d%c\n", row - 1, column - 1);
+	}
+	
+	if(check(row - 2,col + 1) == 1)
+	{
+		if((col + 1) < 8)
+		printf("%d%c\n", row-1, column + 1);
+	}
+	if(check(row + 1,col - 2) == 1)
+	{
+		if((col - 2) >= 0)
+		printf("%d%c\n", row + 2, column - 2);
+	}
+	
+	if(check(row - 1,col - 2) == 1)
+	{
+		if((col - 2) >= 0)
+		printf("%d%c\n", row, column - 2);
+	}
+}
+
+/* Handles moves for Bishop */
+void bishop(int row, int col)
+{
+	int a, b;
+	printf("Available moves for this piece are:\n");
+	int column = col + ofst;
+
+	a = 1;
+	b = 1;
+
+	while(board[row - a][col + b] == '0')
+	{
+		if((row - a) == -1 || (col + b) == 8 || check(row - a, col + b) == 1) 
+		break ;
+		printf("%d%c ", (row - a) + 1, column + b);
+		a++ ;
+		b++ ;
+	}
+	printf("\n");
+
+	a = 1;
+	b = 1;
+
+	while(board[row + a][col - b] == '0')
+	{
+		if((row + a) == 8 || (col - b) == -1 || check(row + a, col - b) == 1)
+		break ;
+		printf("%d%c ", (row + a) + 1, column - b);
+		a++;
+		b++;
+	}
+	printf("\n");
+	a = 1;
+	b = 1;
+
+
+	while(board[row + a][col + b] == '0')
+	{
+		if((row + a) == 8 || (col + b) == 8 || check(row + a, col + b) == 1)
+		break;
+		printf("%d%c ", (row + a) + 1, column + b);
+		a++;
+		b++;
+	}
+	printf("\n");
+	a = 1;
+	b = 1;
+
+	while(board[row - a][col - b] == '0')
+	{
+		if((row - a) == -1 || (col - b) == -1 || check(row - a, col - b) == 1)
+		break;
+		printf("%d%c ", (row - a) + 1 , column - b);
+		a++;
+		b++;
+	}
+	printf("\n");
+}
+
+/* Handles captures for Bishop */
+void bishopC(int row, int col)
+{
+	int a, b;
+	printf("Available captures for this piece are:\n");
+	int column = col + ofst;
+
+	a = 1;
+	b = 1;
+
+	while(check(row - a, col + b) == 0)
+	{
+
+		if((row - a) == -1 || (col + b) > 8)
+		break;
+
+		if(check(row - a, col + b) == 1)
+		{
+			printf("%d%c ", (row - a) + 1, column + b);
+			break;
+		}
+		
+		a++;
+		b++;
+
+	}
+	if((check(row - a, col + b) == 1) && ((row - a) >= 0 || (col + b) < 8))
+	printf("%d%c ", (row - a) + 1, column + b);
+
+	printf("\n");
+
+	a = 1;
+	b = 1;
+
+	while(check(row + a, col - b) == 0)
+	{
+
+		if((row + a) > 8 || (col - b) == -1)
+		break;
+
+		if(check(row + a, col - b) == 1)
+		{
+			printf("%d%c ", (row + a) + 1, column - b);
+			break;
+		}
+
+		a++;
+		b++;
+
+	}
+	if((check(row + a, col - b) == 1) && ((row + a) < 8 || (col - b) >= 0))
+	printf("%d%c ", (row + a) + 1, column - b);
+
+	
+	printf("\n");
+	a = 1;
+	b = 1;
+
+
+	while(check(row + a, col + b) == 0)
+	{
+		if((row + a) > 8 || (col + b) > 8)
+		break;
+		
+		if((check(row + a, col + b) == 1))
+		{
+			printf("%d%c ", (row + a) + 1, column + b);
+			break;
+		}
+
+		a++;
+		b++;
+	}
+	if((check(row + a, col + b) == 1) && ((row + a) < 8 || (col + b) < 8))
+	printf("%d%c ", (row + a) + 1, column + b);
+
+	
+	printf("\n");
+	a = 1;
+	b = 1;
+
+	while(check(row - a, col - b) == 0)
+	{
+		if((row - a) == -1 || (col - b) == -1)
+		break;
+
+		if(check(row - a, col - b) == 1)
+		{
+			printf("%d%c ", (row - a) + 1, column - b);
+			break;
+		}	
+		a++;
+		b++;
+	}
+	if((check(row - a, col - b) == 1)  && ((row - a) >= 0 || (col - b) >= 0))
+	printf("%d%c ", (row - a) + 1, column - b);
+
+	printf("\n");
+}
+
+/* Handles moves for Rook */
+void rook(int row, int col)
+{
+	int i, j, p, k;
+	printf("Available moves for this piece are:\n");
+	int column = col + ofst;
+	
+	/* Horizontal Rook Capture */
+	k = column;
+	p = col;
+	while(board[row][p - 1] == '0' && p > 0)
+	{
+		printf("%d%c ", row + 1, k - 1);
+		k--;
+		p--;
+	}
+	
+	printf("\n");
+	
+	/* Horizontal Rook Capture */
+	k = column;
+	p = col;
+	while(board[row][p + 1] == '0'  && (p + 1) < 8)
+	{
+
+		printf("%d%c ", row + 1, k + 1);
+		++k;
+		++p ;
+	}
+	
+	printf("\n");
+	
+	/* Vertical Rook Capture */
+	p = row;
+	while(board[p - 1][col] == '0' && p >= 0)
+	{
+		printf("%d%c ", p, column);
+		--p ;
+	}
+	
+	printf("\n");
+	
+	/* Vertical Rook Capture */
+	p = row;
+	while((board[p + 1][col] == '0') && (p < 8))
+	{
+		printf("%d%c ", p + 2, column);
+		++p;
+	}
+	printf("\n");
+}
+
+/* Handles capture for Rook */
+void rookC(int row, int col)
+{
+	int i, j, p, k;
+	printf("Available captures for this piece are:\n");
+	int column = col + ofst;
+	k = column;
+	p = col;
+	while(check(row,p - 1) == 0 && p >= 0)
+	{
+		if(check(row,p - 1) == 1 && p >= 0)
+		printf("%d%c ", row + 1, k - 1);
+		k--;
+		p--;
+	}
+	if(check(row,p - 1) == 1 && p >= 0)
+	printf("%d%c ", row + 1, k - 1);
+	printf("\n");
+	k = column;
+	p = col;
+	while(check(row,p + 1) == 0  && (p + 1) < 8)
+	{
+		if(check(row,p + 1) == 1  && (p + 1) < 8)
+		printf("%d%c ", row + 1, k + 1);
+		++k;
+		++p ;
+	}
+	if(check(row,p + 1) == 1  && (p + 1) < 8)
+	printf("%d%c ", row + 1, k + 1);
+	printf("\n");
+	p = row;
+	while(check(p - 1,col) == 0 && p >= 0)
+	{
+		if(check(p - 1,col) == 1 && p >= 0)
+		printf( "%d%c ", p, column);
+		--p ;
+	}
+	if(check(p - 1,col) == 1 && p >= 0)
+	printf("%d%c ", p, column);
+	printf("\n");
+	p = row;
+	while((check(p + 1,col) == 0) && (p < 8))
+	{
+		if((check(p + 1,col) == 1) && (p < 8))
+		printf("%d%c ", p + 2, column);
+		++p;
+	}
+	if((check(p + 1,col) == 1) && (p < 8))
+	printf("%d%c ", p + 2, column);
+	printf("\n");
+}
+
+/* Handles moves for King */
+void king(int row, int col)
+{
+	printf("Available moves for this piece are:\n");
+	int column = col + ofst;
+	
+	if(board[row][col + 1] == '0') 
+	printf("%d%c ", row + 1, column + 1);
+	printf("\n");
+
+	if(board[row][col - 1] == '0') 
+	printf("%d%c ", row + 1, column - 1);
+	printf("\n");
+
+	if(board[row + 1][col] == '0') 
+	printf("%d%c ", row + 2, column);
+	printf("\n");
+
+	if(board[row - 1][col] == '0') 
+	printf("%d%c ", row, column);
+	printf("\n");
+
+	if(board[row + 1][col + 1] == '0') 
+	printf("%d%c ", row + 2, column + 1);
+	printf("\n");
+
+	if(board[row - 1][col - 1] == '0') 
+	printf("%d%c ", row, column - 1);
+	printf("\n");
+
+	if(board[row - 1][col + 1] == '0') 
+	printf("%d%c ", row, column + 1);
+	printf("\n");
+
+	if(board[row + 1][col - 1] == '0') 
+	printf("%d%c ", row + 2, column - 1);
+	printf("\n");
+}
+
+/* Handles captures for King */
+void kingC(int row, int col)
+{
+	printf("Available captures for this piece are:\n");
+	int column = col + ofst;
+	
+	if(check(row, col + 1) == 1) 
+	printf("%d%c ", row + 1, column + 1);
+	printf("\n");
+
+	if(check(row, col - 1) == 1) 
+	printf("%d%c ", row + 1, column - 1);
+	printf("\n");
+
+	if(check(row + 1, col) == 1) 
+	printf("%d%c ", row + 2, column);
+	printf("\n");
+
+	if(check(row - 1, col) == 1) 
+	printf("%d%c ", row, column);
+	printf("\n");
+
+	if(check(row + 1, col + 1) == 1) 
+	printf("%d%c ", row + 2, column + 1);
+	printf("\n");
+
+	if(check(row - 1, col - 1) == 1) 
+	printf("%d%c ", row, column - 1);
+	printf("\n");
+
+	if(check(row - 1, col + 1) == 1) 
+	printf("%d%c ", row, column + 1);
+	printf("\n");
+
+	if(check(row + 1, col - 1) == 1) 
+	printf("%d%c ", row + 2, column - 1);
+	printf("\n");
+}
+
+/* Handles moves for Queen */
+void queen(int row, int col)
+{
+	int i, j, p, k, a, b;
+	printf("Available moves for this piece are:\n");
+	int column = col + ofst;
+	k = column;
+	p = col;
+	while(board[row][p - 1] == '0' && p > 0)
+	{
+		printf("%d%c ", row + 1, k - 1);
+		k--;
+		p--;
+	}
+	
+	printf("\n");
+	k = column;
+	p = col;
+	while(board[row][p + 1] == '0'  && (p + 1) < 8)
+	{
+
+		printf("%d%c ", row + 1, k + 1);
+		++k;
+		++p ;
+	}
+	
+	printf("\n");
+	p = row;
+	while(board[p - 1][col] == '0' && p >= 0)
+	{
+		printf("%d%c ", p, column);
+		--p ;
+	}
+	
+	printf("\n");
+	p = row;
+	while((board[p + 1][col] == '0') && (p < 8))
+	{
+		printf("%d%c ", p + 2, column);
+		++p;
+	}
+	printf("\n");
+
+	a = 1;
+	b = 1;
+
+	while(board[row - a][col + b] == '0')
+	{
+		if((row - a) == -1 || (col + b) == 8 || check(row - a, col + b) == 1) 
+		break ;
+		printf("%d%c ", (row - a) + 1, column + b);
+		a++ ;
+		b++ ;
+	}
+	printf("\n");
+
+	a = 1;
+	b = 1;
+
+	while(board[row + a][col - b] == '0')
+	{
+		if((row + a) == 8 || (col - b) == -1 || check(row + a, col - b) == 1)
+		break ;
+		printf("%d%c ", (row + a) + 1, column - b);
+		a++;
+		b++;
+	}
+	printf("\n");
+	a = 1;
+	b = 1;
+
+
+	while(board[row + a][col + b] == '0')
+	{
+		if((row + a) == 8 || (col + b) == 8 || check(row + a, col + b) == 1)
+		break;
+		printf("%d%c ", (row + a) + 1, column + b);
+		a++;
+		b++;
+	}
+	printf("\n");
+	a = 1;
+	b = 1;
+
+	while(board[row - a][col - b] == '0')
+	{
+		if((row - a) == -1 || (col - b) == -1 || check(row - a, col - b) == 1)
+		break;
+		printf("%d%c ", (row - a) + 1 , column - b);
+		a++;
+		b++;
+	}
+	printf("\n");
+}
+
+/* Handles captures for White Queen */
+void queenC(int row, int col)
+{
+	int i, j, p, k, a, b;
+	printf("Available captures for this piece are:\n");
+	int column = col + ofst;
+	k = column;
+	p = col;
+	
+	/* Vertical Captures */
+	while(check(row,p - 1) == 0 && p >= 0)
+	{
+		if(check(row,p - 1) == 1 && p >= 0)
+		printf("%d%c ", row + 1, k - 1);
+		k--;
+		p--;
+	}
+	if(check(row,p - 1) == 1 && p >= 0)
+	printf("%d%c ", row + 1, k - 1);
+	printf("\n");
+	k = column;
+	p = col;
+	while(check(row,p + 1) == 0  && (p + 1) < 8)
+	{
+		if(check(row,p + 1) == 1  && (p + 1) < 8)
+		printf("%d%c ", row + 1, k + 1);
+		++k;
+		++p ;
+	}
+	if(check(row,p + 1) == 1  && (p + 1) < 8)
+	printf("%d%c ", row + 1, k + 1);
+	printf("\n");
+	p = row;
+	while(check(p - 1,col) == 0 && p >= 0)
+	{
+		if(check(p - 1,col) == 1 && p >= 0)
+		printf( "%d%c ", p, column);
+		--p ;
+	}
+	if(check(p - 1,col) == 1 && p >= 0)
+	printf("%d%c ", p, column);
+	printf("\n");
+	p = row;
+	while((check(p + 1,col) == 0) && (p < 8))
+	{
+		if((check(p + 1,col) == 1) && (p < 8))
+		printf( "%d%c ", p + 2, column);
+		++p;
+	}
+	if((check(p + 1,col) == 1) && (p < 8))
+	printf("%d%c ", p + 2, column);
+	printf("\n");
+	
+	/* Diagonal Captures */
+	a = 1;
+	b = 1;
+
+	while(check(row - a, col + b) == 0)
+	{
+
+		if((row - a) == -1 || (col + b) > 8)
+		break;
+
+		if(check(row - a, col + b) == 1)
+		{
+			printf("%d%c ", (row - a) + 1, column + b);
+			break;
+		}
+		
+		a++;
+		b++;
+
+	}
+	if((check(row - a, col + b) == 1) && ((row - a) >= 0 || (col + b) < 8))
+	printf("%d%c ", (row - a) + 1, column + b);
+
+	printf("\n");
+
+	a = 1;
+	b = 1;
+
+	while(check(row + a, col - b) == 0)
+	{
+
+		if((row + a) > 8 || (col - b) == -1)
+		break;
+
+		if(check(row + a, col - b) == 1)
+		{
+			printf("%d%c ", (row + a) + 1, column - b);
+			break;
+		}
+
+		a++;
+		b++;
+
+	}
+	if((check(row + a, col - b) == 1) && ((row + a) < 8 || (col - b) >= 0))
+	printf("%d%c ", (row + a) + 1, column - b);
+
+	
+	printf("\n");
+	a = 1;
+	b = 1;
+
+
+	while(check(row + a, col + b) == 0)
+	{
+
+		if((row + a) > 8 || (col + b) > 8)
+		break;
+
+		a++;
+		b++;
+	}
+	if((check(row + a, col + b) == 1) && ((row + a) < 8 || (col + b) < 8))
+	printf("%d%c ", (row + a) + 1, column + b);
+
+	
+	printf("\n");
+	a = 1;
+	b = 1;
+
+	while(check(row - a, col - b) == 0)
+	{
+		if((row - a) == -1 || (col - b) == -1)
+		break;
+
+		if(check(row - a, col - b) == 1)
+		{
+			printf("%d%c ", (row - a) + 1, column - b);
+			break;
+		}	
+		a++;
+		b++;
+	}
+	if((check(row - a, col - b) == 1)  && ((row - a) >= 0 || (col - b) >= 0))
+	printf("%d%c ", (row - a) + 1, column - b);
+
+	printf("\n");
+	
+}
+
+/* Handles moves for Black Pawns */
+void pawnb(int row, int col)
+{
+	printf("Available moves for this piece are:\n");
+
+	int column = col + ofst;//Convert int to a char
+
+	p[col]++;
+	if(p[col] == 1)
+	{
+		if(board[row + 1][col] == '0')
+		{
+			printf("%d%c\n", row + 2, column);
+		}		
+		if(board[row + 2][col] == '0')
+		{
+			printf("%d%c\n", row + 3, column);
+		}	
+	}
+	else
+	{
+		if(board[row + 1][col] == '0')
+		{
+			printf("%d%c\n", row + 2, column);
+		}	
+	}
+}
+
+/* Handles captures for Black Pawns */
+void pawnCb(int row, int col)
+{
+	printf("Available captures for this piece are:\n");
+	int column = col + ofst;
+	
+	if(check2(row + 1, col - 1) == 1)
+	{
+		printf("%d%c\n", row + 2, column - 1);
+	}
+
+	if(check2(row + 1,col + 1) == 1)
+	{
+		printf("%d%c\n", row + 2, column + 1);
+		
+	}
+	
+	if(check2(row + 1,col + 1) == 0 && check2(row + 1, col - 1) == 0)
+	{
+		printf("There are no available pieces to capture.\n");
+	}
+}
+
+/* Handles captures for Black King */
+void knightCb(int row, int col)
+{
+	printf("Available captures for this piece are:\n");
+	int column = col + ofst;
+	
+	if(check2(row + 2,col + 1) == 1)
+	{
+		if((col + 1) < 8)
+		printf("%d%c\n", row + 3, column + 1);
+	}
+	if(check2(row + 2,col - 1) == 1)
+	{
+		if((col - 1) >= 0)
+		printf("%d%c\n", row + 3, column - 1);
+	}
+	
+	if(check2(row + 1,col + 2) == 1)
+	{
+		if((col + 2) < 8)
+		printf("%d%c\n", row + 2, column + 2);
+	}
+	if(check2(row - 1,col + 2) == 1)
+	{
+		if((col + 2) < 8)
+		printf("%d%c\n", row, column + 2);
+	}
+	
+	if(check2(row - 2,col - 1) == 1)
+	{
+		if((col - 1) >= 0)
+		printf("%d%c\n", row - 1, column - 1);
+	}
+	
+	if(check2(row - 2,col + 1) == 1)
+	{
+		if((col + 1) < 8)
+		printf("%d%c\n", row-1, column + 1);
+	}
+	if(check2(row + 1,col - 2) == 1)
+	{
+		if((col - 2) >= 0)
+		printf("%d%c\n", row + 2, column - 2);
+	}
+	
+	if(check2(row - 1,col - 2) == 1)
+	{
+		if((col - 2) >= 0)
+		printf("%d%c\n", row, column - 2);
+	}
+}
+
+/* Handles captures for Black Bishops */
+void bishopCb(int row, int col)
+{
+	int a, b;
+	printf("Available captures for this piece are:\n");
+	int column = col + ofst;
+
+	a = 1;
+	b = 1;
+
+	while(check2(row - a, col + b) == 0)
+	{
+
+		if((row - a) == -1 || (col + b) > 8)
+		break;
+
+		if(check2(row - a, col + b) == 1)
+		{
+			printf("%d%c ", (row - a) + 1, column + b);
+			break;
+		}
+		
+		a++;
+		b++;
+
+	}
+	if((check2(row - a, col + b) == 1) && ((row - a) >= 0 || (col + b) < 8))
+	printf("%d%c ", (row - a) + 1, column + b);
+
+	printf("\n");
+
+	a = 1;
+	b = 1;
+
+	while(check2(row + a, col - b) == 0)
+	{
+
+		if((row + a) > 8 || (col - b) == -1)
+		break;
+
+		if(check2(row + a, col - b) == 1)
+		{
+			printf("%d%c ", (row + a) + 1, column - b);
+			break;
+		}
+
+		a++;
+		b++;
+
+	}
+	if((check2(row + a, col - b) == 1) && ((row + a) < 8 || (col - b) >= 0))
+	printf("%d%c ", (row + a) + 1, column - b);
+
+	
+	printf("\n");
+	a = 1;
+	b = 1;
+
+
+	while(check2(row + a, col + b) == 0)
+	{
+
+		if((row + a) > 8 || (col + b) > 8)
+		break;
+		
+		if((check2(row + a, col + b) == 1))
+		{
+			printf("%d%c ", (row + a) + 1, column + b);
+			break;
+		}
+
+		a++;
+		b++;
+	}
+	if((check2(row + a, col + b) == 1) && ((row + a) < 8 || (col + b) < 8))
+	printf("%d%c ", (row + a) + 1, column + b);
+
+	
+	printf("\n");
+	a = 1;
+	b = 1;
+
+	while(check2(row - a, col - b) == 0)
+	{
+		if((row - a) == -1 || (col - b) == -1)
+		break;
+
+		if(check2(row - a, col - b) == 1)
+		{
+			printf("%d%c ", (row - a) + 1, column - b);
+			break;
+		}	
+		a++;
+		b++;
+	}
+	if((check2(row - a, col - b) == 1)  && ((row - a) >= 0 || (col - b) >= 0))
+	printf("%d%c ", (row - a) + 1, column - b);
+
+	printf("\n");
+}
+
+/* Handles captures for Black Rook */
+void rookCb(int row, int col)
+{
+	int i, j, p, k;
+	printf("Available captures for this piece are:\n");
+	int column = col + ofst;
+	
+	/* Horizontal Rook Capture */
+	k = column;
+	p = col;
+	while(check2(row,p - 1) == 0 && p >= 0)
+	{
+		if(check2(row,p - 1) == 1 && p >= 0)
+		printf("%d%c ", row + 1, k - 1);
+		k--;
+		p--;
+	}
+	if(check2(row,p - 1) == 1 && p >= 0)
+	printf("%d%c ", row + 1, k - 1);
+	printf("\n");
+	
+	/* Horizontal Rook Capture */
+	k = column;
+	p = col;
+	while(check2(row,p + 1) == 0  && (p + 1) < 8)
+	{
+		if(check2(row,p + 1) == 1  && (p + 1) < 8)
+		printf("%d%c ", row + 1, k + 1);
+		++k;
+		++p ;
+	}
+	if(check2(row,p + 1) == 1  && (p + 1) < 8)
+	printf("%d%c ", row + 1, k + 1);
+	printf("\n");
+	
+	/* Vertical Rook Capture */
+	p = row;
+	while(check2(p - 1,col) == 0 && p >= 0)
+	{
+		if(check2(p - 1,col) == 1 && p >= 0)
+		printf( "%d%c ", p, column);
+		--p ;
+	}
+	if(check2(p - 1,col) == 1 && p >= 0)
+	printf("%d%c ", p, column);
+	printf("\n");
+	
+	/* Vertical Rook Capture */
+	p = row;
+	while((check2(p + 1,col) == 0) && (p < 8))
+	{
+		if((check2(p + 1,col) == 1) && (p < 8))
+		printf("%d%c ", p + 2, column);
+		++p;
+	}
+	if((check2(p + 1,col) == 1) && (p < 8))
+	printf("%d%c ", p + 2, column);
+	printf("\n");
+}
+
+/* Handles captures for Black King */
+void kingCb(int row, int col)
+{
+	printf("Available captures for this piece are:\n");
+	int column = col + ofst;
+	
+	if(check2(row, col + 1) == 1) 
+	printf("%d%c ", row + 1, column + 1);
+	printf("\n");
+
+	if(check2(row, col - 1) == 1) 
+	printf("%d%c ", row + 1, column - 1);
+	printf("\n");
+
+	if(check2(row + 1, col) == 1) 
+	printf("%d%c ", row + 2, column);
+	printf("\n");
+
+	if(check2(row - 1, col) == 1) 
+	printf("%d%c ", row, column);
+	printf("\n");
+
+	if(check2(row + 1, col + 1) == 1) 
+	printf("%d%c ", row + 2, column + 1);//
+	printf("\n");
+
+	if(check2(row - 1, col - 1) == 1) 
+	printf("%d%c ", row, column - 1);
+	printf("\n");
+
+	if(check2(row - 1, col + 1) == 1) 
+	printf("%d%c ", row, column + 1);
+	printf("\n");
+
+	if(check2(row + 1, col - 1) == 1) 
+	printf("%d%c ", row + 2, column - 1);
+	printf("\n");
+}
+
+/* Handles captures for Black Queen */
+void queenCb(int row, int col)
+{
+	int i, j, p, k, a, b;
+	printf("Available captures for this piece are:\n");
+	int column = col + ofst;
+	k = column;
+	p = col;
+	
+	/* Vertical Captures */
+	while(check2(row,p - 1) == 0 && p >= 0)
+	{
+		if(check2(row,p - 1) == 1 && p >= 0)
+		printf("%d%c ", row + 1, k - 1);
+		k--;
+		p--;
+	}
+	if(check2(row,p - 1) == 1 && p >= 0)
+	printf("%d%c ", row + 1, k - 1);
+	printf("\n");
+	k = column;
+	p = col;
+	while(check2(row,p + 1) == 0  && (p + 1) < 8)
+	{
+		if(check2(row,p + 1) == 1  && (p + 1) < 8)
+		printf("%d%c ", row + 1, k + 1);
+		++k;
+		++p ;
+	}
+	if(check2(row,p + 1) == 1  && (p + 1) < 8)
+	printf("%d%c ", row + 1, k + 1);
+	printf("\n");
+	
+	/* Horizontal Captures */
+	p = row;
+	while(check2(p - 1,col) == 0 && p >= 0)
+	{
+		if(check2(p - 1,col) == 1 && p >= 0)
+		printf( "%d%c ", p, column);
+		--p ;
+	}
+	if(check2(p - 1,col) == 1 && p >= 0)
+	printf("%d%c ", p, column);
+	printf("\n");
+	p = row;
+	while((check2(p + 1,col) == 0) && (p < 8))
+	{
+		if((check2(p + 1,col) == 1) && (p < 8))
+		printf( "%d%c ", p + 2, column);
+		++p;
+	}
+	if((check2(p + 1,col) == 1) && (p < 8))
+	printf("%d%c ", p + 2, column);
+	printf("\n");
+	
+	/* Diagonal Captures */
+	a = 1;
+	b = 1;
+
+	while(check2(row - a, col + b) == 0)
+	{
+		if((row - a) == -1 || (col + b) > 8)
+		break;
+
+		if(check2(row - a, col + b) == 1)
+		{
+			printf("%d%c ", (row - a) + 1, column + b);
+			break;
+		}
+		
+		a++;
+		b++;
+
+	}
+	if((check2(row - a, col + b) == 1) && ((row - a) >= 0 || (col + b) < 8))
+	printf("%d%c ", (row - a) + 1, column + b);
+
+	printf("\n");
+
+	a = 1;
+	b = 1;
+
+	while(check2(row + a, col - b) == 0)
+	{
+
+		if((row + a) > 8 || (col - b) == -1)
+		break;
+
+		if(check2(row + a, col - b) == 1)
+		{
+			printf("%d%c ", (row + a) + 1, column - b);
+			break;
+		}
+
+		a++;
+		b++;
+
+	}
+	if((check2(row + a, col - b) == 1) && ((row + a) < 8 || (col - b) >= 0))
+	printf("%d%c ", (row + a) + 1, column - b);
+
+	
+	printf("\n");
+	a = 1;
+	b = 1;
+
+
+	while(check2(row + a, col + b) == 0)
+	{
+
+		if((row + a) > 8 || (col + b) > 8)
+		break;
+
+		a++;
+		b++;
+	}
+	if((check2(row + a, col + b) == 1) && ((row + a) < 8 || (col + b) < 8))
+	printf("%d%c ", (row + a) + 1, column + b);
+
+	
+	printf("\n");
+	a = 1;
+	b = 1;
+
+	while(check2(row - a, col - b) == 0)
+	{
+		if((row - a) == -1 || (col - b) == -1)
+		break;
+
+		if(check2(row - a, col - b) == 1)
+		{
+			printf("%d%c ", (row - a) + 1, column - b);
+			break;
+		}	
+		a++;
+		b++;
+	}
+	if((check2(row - a, col - b) == 1)  && ((row - a) >= 0 || (col - b) >= 0))
+	printf("%d%c ", (row - a) + 1, column - b);
+
+	printf("\n");
+}
+
+
+/* Checks for capture locations for White */
+int check(int row, int col)
+{
+	switch(board[row][col])
+	{
+	case 'p':
+	case 'k':
+	case 'b':
+	case 'r':
+	case 'q':
+	case 'a':
+		return 1;
+	default:
+		return 0;
+	}
+	
+}
+
+/* Checks for capture locations for Black */
+int check2(int row, int col)
+{
+	switch(board[row][col])
+	{
+	case 'P':
+	case 'K':
+	case 'B':
+	case 'R':
+	case 'Q':
+	case 'A':
+		return 1;
+	default:
+		return 0;
+	}
+	
+}
+
+/* Display Current Board in .tl5 on screen */
+void show(FILE *bFile)
+{	 
+	while((ch = getc(bFile)) != EOF)
+	{
+		if(ch == ',')
+		{
+			continue;
+		}
+		else
+		{
+			printf("%-5.5c|", ch);
+		}		
+	} 
+}  
